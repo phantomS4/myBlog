@@ -1,17 +1,40 @@
 var express = require('express');
 var router = express.Router();
-var crypto = require('crypto'),
-  User = require('../models/user.js');
-
+var crypto = require('crypto');
+var User = require('../models/user.js');
+var Post = require('../models/post.js');
 /* GET home page. */
 router.get('/', function (req, res,next) {
-     res.render('index', {
-    title: '主页',
-    user: req.session.user,
-    success: req.flash('success').toString(),
-    error: req.flash('error').toString()
+     Post.get(null, function (err, posts) {
+    if (err) {
+      posts = [];
+    } 
+    res.render('index', {
+      title: '主页',
+      user: req.session.user,
+      posts: posts,
+      success: req.flash('success').toString(),
+      error: req.flash('error').toString()
+    });
   });
   });
+
+router.get('/upload',checkLogin);
+router.get('/upload',function(req,res){
+  res.render('upload',{
+    title:'文件上传',
+    user:req.session.user,
+    success:req.flash('success').toString(),
+    error:req.flash('error').toString()
+  });
+});
+
+router.post('/upload', checkLogin);
+router.post('/upload', function (req, res,next) {
+  req.flash('success', '文件上传成功!');
+  res.redirect('/upload');
+});
+
  router.get('/reg', function (req, res,next) {
   res.render('reg', {
     title: '注册',
@@ -59,6 +82,7 @@ router.get('/', function (req, res,next) {
     });
   });
   });
+ router.post('/login',checkNotLogin);
  router.post('/login', function (req, res,next) {
   //生成密码的 md5 值
   var md5 = crypto.createHash('md5'),
@@ -87,15 +111,45 @@ router.get('/', function (req, res,next) {
         success: req.flash('success').toString(),
         error: req.flash('error').toString()});
   });
+ router.get('/post',checkLogin);
  router.get('/post', function (req, res,next) {
-    res.render('post', { title: '发表' });
+    res.render('post', { title: '发表',
+      user: req.session.user,
+    success: req.flash('success').toString(),
+    error: req.flash('error').toString() });
   });
  router.post('/post', function (req, res,next) {
+    var currentUser = req.session.user,
+      post = new Post(currentUser.name, req.body.title, req.body.post);
+  post.save(function (err) {
+    if (err) {
+      req.flash('error', err); 
+      return res.redirect('/');
+    }
+    req.flash('success', '发布成功!');
+    res.redirect('/');//发表成功跳转到主页
   });
+  });
+ router.get('/logout',checkLogin);
  router.get('/logout', function (req, res,next) {
     req.session.user = null;
   req.flash('success', '登出成功!');
   res.redirect('/');//登出成功后跳转到主
   });
 
+  function checkLogin(req, res, next) {
+    if (!req.session.user) {
+      req.flash('error', '未登录!'); 
+      res.redirect('/login');
+    }
+    next();
+  }
+
+  function checkNotLogin(req, res, next) {
+    if (req.session.user) {
+      req.flash('error', '已登录!'); 
+      res.redirect('back');
+    }
+    next();
+  }
 module.exports = router;
